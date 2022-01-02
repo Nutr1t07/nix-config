@@ -13,15 +13,16 @@
   ];
 
   nix.binaryCaches = [
+    "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
     "https://mirrors.ustc.edu.cn/nix-channels/store"
     "https://hydra.iohk.io"
   ];
   nixpkgs.config.allowUnfree = true;
 
-  systemd.services.nix-daemon.environment = {
-    http_proxy = "http://127.0.0.1:10809/";
-    https_proxy = "http://127.0.0.1:10809/"; 
-  };
+#  systemd.services.nix-daemon.environment = {
+#    http_proxy = "http://127.0.0.1:10809/";
+#    https_proxy = "http://127.0.0.1:10809/"; 
+#  };
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -29,8 +30,23 @@
 
   time.timeZone = "Asia/Shanghai";
 
+
+  location = {
+    provider = "manual";
+    latitude = 23.0;
+    longitude = 116.0;
+  };
+
   networking = {
     hostName = "hasee-nixos";
+    defaultGateway = "192.168.0.3";
+    nameservers = [ "192.168.0.3" "8.8.8.8" ];
+    dhcpcd.extraConfig = ''
+      interface enp2s0f1
+      static ip_address=192.168.0.123/24	
+      static routers=192.168.0.3
+      static domain_name_servers=192.168.0.3 8.8.8.8
+    '';
     networkmanager.enable = true;
     interfaces.enp2s0f1.useDHCP = true;
     interfaces.wlp3s0.useDHCP = true;
@@ -40,27 +56,45 @@
       defaultLocale = "en_US.UTF-8";
       supportedLocales = [ "zh_CN.UTF-8/UTF-8" "en_US.UTF-8/UTF-8" ];
       inputMethod.enabled = "fcitx5";
-      inputMethod.fcitx5.addons = [ pkgs.fcitx5-rime pkgs.fcitx5-configtool ];
+      inputMethod.fcitx5.addons = [ pkgs.fcitx5-rime pkgs.fcitx5-chinese-addons pkgs.fcitx5-configtool ];
   };
-  
+
+  services.xserver.desktopManager.plasma5.enable = true;
+  services.xserver.displayManager.sddm.enable = true;
   services.xserver.enable = true;
 
-  services.xserver.displayManager.sddm.enable = true;
-  services.xserver.desktopManager.plasma5.enable = true;
-
   sound.enable = true;
-  hardware.pulseaudio.enable = true;
-  hardware.bluetooth.enable = true;
+  hardware = {
+    pulseaudio.enable = true;
+    bluetooth.enable = true;
+    opengl = {
+      enable = true;
+      extraPackages = with pkgs; [
+        intel-media-driver # LIBVA_DRIVER_NAME=iHD
+        vaapiIntel         # LIBVA_DRIVER_NAME=i965 (older but works better for Firefox/Chromium)
+        vaapiVdpau
+        libvdpau-va-gl
+      ];
+    };
+  };
 
   users.users.ne1s07 = {
+    description = "Ne1s07 X";
     isNormalUser = true;
-    extraGroups = [ "wheel" ];
+    extraGroups = [ "wheel" "adbusers" "vboxusers" ];
   };
+
+   ## VitrualBox
+   virtualisation.virtualbox.host.enable = true;
+   virtualisation.virtualbox.host.enableExtensionPack = true;
+   users.extraGroups.vboxusers.members = [ "user-with-access-to-virtualbox" ];
 
   environment.systemPackages = with pkgs; [
     # tool
     calibre
     gimp
+    ffmpeg
+    scrcpy
 
     # network
     wget
@@ -80,6 +114,7 @@
     tdesktop
 
     # system tool
+    rxvt_unicode
     neofetch
     tree
     unrar
@@ -89,16 +124,21 @@
     jre
     kfind
     nix-index
+    fzf
+    p7zip
+    rpPPPoE
+    python37
+    
 
     # editor
     vimHugeX
     vim
     vscode-fhs
+    emacs
 
     # programming
     stack
     gcc
-    haskell-language-server
     niv
 
     # health
@@ -106,7 +146,24 @@
    
     # media
     mpv
+    ranger
+
+    # gaming
+    lutris
+
+    wineWowPackages.stable
   ];
+
+  nixpkgs.config.packageOverrides = pkgs: {
+    nur = import (builtins.fetchTarball "https://github.com/nix-community/NUR/archive/master.tar.gz") {
+      inherit pkgs;
+    };
+    steam = pkgs.steam.override {
+      extraPkgs = pkgs: with pkgs; [
+        libpng
+      ];
+    };
+  };
   
   fonts = {
     enableDefaultFonts = true;
@@ -144,23 +201,25 @@
       syntaxHighlighting.enable = true;
       ohMyZsh = {
         enable = true;
-        theme = "agnoster";
-        plugins = [ "git" "python" "man" "extract"];
+        theme = "ys";
+        plugins = [ "git" "man" "extract"];
       };
     };
     bash.enableCompletion = true;
     dconf.enable = true;
-    # steam.enable = true;
+    adb.enable = true;
+    steam.enable = true;
   };
 
   users.defaultUserShell = pkgs.zsh;
 
   services = {
     tlp.enable = true;
-    blueman.enable = true;
+    ## blueman.enable = true;
+    ## redshift.enable = true;
   };
 
-  system.stateVersion = "21.05";
-  system.autoUpgrade.enable = false;
+  system.stateVersion = "21.11";
+  system.autoUpgrade.enable = true;
 }
 
